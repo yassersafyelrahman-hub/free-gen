@@ -1,21 +1,17 @@
 {
   "port": 3000,
-  "allowedOrigin": "",
+  "shopUrl": "https://yassersafy.com",
+  "currencySymbol": "$",
+  "artistName": "Yasser Safy",
+  "model": "gemini-2.5-flash",
+  "allowedOrigins": [
+    "https://yassersafy.com",
+    "https://www.yassersafy.com"
+  ],
   "trustProxy": true,
-  "maxPromptLength": 500,
-  "retentionHours": 24,
-  "image": {
-    "models": ["flux", "turbo"],
-    "maxPerHour": 30,
-    "maxConcurrent": 4
-  },
-  "video": {
-    "enabled": true,
-    "spaceUrl": "",
-    "apiName": "/generate",
-    "inputs": ["{{prompt}}", "{{seed}}"],
-    "maxPerHour": 3,
-    "maxQueue": 5,
-    "timeoutSeconds": 600
-  }
+  "maxMessageLength": 600,
+  "maxHistory": 10,
+  "perIpPerHour": 25,
+  "dailyCap": 600,
+  "catalogRefreshMinutes": 30
 }
