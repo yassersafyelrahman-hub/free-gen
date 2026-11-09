@@ -196,7 +196,27 @@ CATALOG (${catalog.items.length} items; each line is: [handle] title | type | pr
 ${catalog.text}`;
 }
 
+// Tries the main model first; if Google is overloaded (5xx / 429 / timeout) it falls back to the next model.
+const FALLBACKS = (process.env.GEMINI_FALLBACK_MODELS ? process.env.GEMINI_FALLBACK_MODELS.split(',') : (config.fallbackModels || []))
+  .map(s => s.trim()).filter(m => m && m !== MODEL);
 async function askGemini(history) {
+  let firstErr = null;
+  for (const model of [MODEL, ...FALLBACKS]) {
+    try {
+      const out = await callGemini(model, history);
+      out.model = model;
+      return out;
+    } catch (e) {
+      if (!firstErr) firstErr = e;
+      const retriable = ['AI_ERROR', 'AI_QUOTA', 'AI_TIMEOUT'].includes(e.code);
+      console.error(`model ${model} failed: ${e.code} ${e.detail || ''}${retriable && model !== FALLBACKS[FALLBACKS.length - 1] ? ' -> trying next' : ''}`);
+      if (!retriable) throw firstErr;
+    }
+  }
+  throw firstErr;
+}
+
+async function callGemini(model, history) {
   const body = {
     systemInstruction: { parts: [{ text: systemPrompt() }] },
     contents: history.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
@@ -213,7 +233,7 @@ async function askGemini(history) {
   };
   let r;
   try {
-    r = await fetch(`${GEMINI_BASE}/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`, {
+    r = await fetch(`${GEMINI_BASE}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': API_KEY },
       body: JSON.stringify(body),
@@ -289,7 +309,7 @@ async function handleDiagnose(req, res) {
   if (!catalog.items.length) return send(req, res, 503, { error: 'CATALOG_UNAVAILABLE', detail: catalog.error });
   try {
     const out = await askGemini([{ role: 'user', content: 'hello' }]);
-    send(req, res, 200, { ok: true, model: MODEL, reply: out.reply, products: out.handles });
+    send(req, res, 200, { ok: true, model: out.model, reply: out.reply, products: out.handles });
   } catch (e) {
     send(req, res, 200, { ok: false, model: MODEL, error: e.code || 'ERROR', detail: e.detail || e.message });
   }

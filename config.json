@@ -3,7 +3,8 @@
   "shopUrl": "https://yassersafy.com",
   "currencySymbol": "$",
   "artistName": "Yasser Safy",
-  "model": "gemini-2.5-flash",
+  "model": "gemini-3.8-flash",
+  "fallbackModels": ["gemini-3.5-flash", "gemini-flash-latest"],
   "allowedOrigins": [
     "https://yassersafy.com",
     "https://www.yassersafy.com"
