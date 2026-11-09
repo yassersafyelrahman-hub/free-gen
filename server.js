@@ -202,7 +202,7 @@ async function askGemini(history) {
     contents: history.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
     generationConfig: {
       temperature: 0.4,
-      maxOutputTokens: 1500,
+      maxOutputTokens: 4096,
       responseMimeType: 'application/json',
       responseSchema: {
         type: 'OBJECT',
@@ -222,18 +222,26 @@ async function askGemini(history) {
   } catch (e) {
     throw fail(e.name === 'TimeoutError' ? 'AI_TIMEOUT' : 'AI_ERROR', 504);
   }
-  if (r.status === 429) throw fail('AI_QUOTA', 503);
-  if (r.status === 400 || r.status === 401 || r.status === 403 || r.status === 404) throw fail('AI_CONFIG', 502, r.status);
-  if (!r.ok) throw fail('AI_ERROR', 502, r.status);
+  if (!r.ok) {
+    let msg = '';
+    try { const eb = await r.json(); msg = (eb.error && eb.error.message) || ''; } catch {}
+    const detail = `${r.status}: ${String(msg).slice(0, 300)}`;
+    if (r.status === 429) throw fail('AI_QUOTA', 503, detail);
+    if ([400, 401, 403, 404].includes(r.status)) throw fail('AI_CONFIG', 502, detail);
+    throw fail('AI_ERROR', 502, detail);
+  }
   const j = await r.json();
-  const text = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts &&
-    j.candidates[0].content.parts.map(p => p.text || '').join('');
-  if (!text) throw fail('AI_BLOCKED', 502);
+  const cand = j.candidates && j.candidates[0];
+  const text = cand && cand.content && cand.content.parts && cand.content.parts.map(p => p.text || '').join('');
+  if (!text) throw fail('AI_BLOCKED', 502, (cand && cand.finishReason) || (j.promptFeedback && j.promptFeedback.blockReason) || 'no candidates');
   try {
     const o = JSON.parse(text);
     return { reply: String(o.reply || '').slice(0, 1500), handles: Array.isArray(o.products) ? o.products : [] };
   } catch {
-    return { reply: text.slice(0, 1500), handles: [] };
+    // truncated JSON: recover the reply text if possible instead of showing raw JSON
+    const m = /"reply"\s*:\s*"((?:[^"\\]|\\.)*)/.exec(text);
+    if (m) { try { return { reply: JSON.parse('"' + m[1] + '"').slice(0, 1500), handles: [] }; } catch {} }
+    throw fail('AI_BLOCKED', 502, 'unparseable output');
   }
 }
 
@@ -270,7 +278,20 @@ async function handleChat(req, res) {
     send(req, res, 200, { reply: out.reply, products });
   } catch (e) {
     console.error('chat error:', e.code || e.message, e.detail || '');
-    send(req, res, e.status || 500, { error: e.code || 'AI_ERROR', detail: e.detail });
+    send(req, res, e.status || 500, { error: e.code || 'AI_ERROR' });
+  }
+}
+
+// Open /api/diagnose in a browser to see the exact reason a chat call fails (for setup/debugging).
+async function handleDiagnose(req, res) {
+  if (!API_KEY) return send(req, res, 503, { error: 'BOT_DISABLED' });
+  if (ipLimited(clientIp(req))) return send(req, res, 429, { error: 'RATE' });
+  if (!catalog.items.length) return send(req, res, 503, { error: 'CATALOG_UNAVAILABLE', detail: catalog.error });
+  try {
+    const out = await askGemini([{ role: 'user', content: 'hello' }]);
+    send(req, res, 200, { ok: true, model: MODEL, reply: out.reply, products: out.handles });
+  } catch (e) {
+    send(req, res, 200, { ok: false, model: MODEL, error: e.code || 'ERROR', detail: e.detail || e.message });
   }
 }
 
@@ -305,6 +326,7 @@ const server = http.createServer(async (req, res) => {
       });
     }
     if (req.method === 'GET' && url.pathname === '/api/models') return await handleModels(req, res);
+    if (req.method === 'GET' && url.pathname === '/api/diagnose') return await handleDiagnose(req, res);
     if (req.method === 'POST' && url.pathname === '/api/chat') return await handleChat(req, res);
     if (req.method === 'GET' && STATIC[url.pathname]) {
       const [file, type] = STATIC[url.pathname];

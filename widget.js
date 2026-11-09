@@ -28,6 +28,9 @@
       'err.CATALOG_UNAVAILABLE': 'بحمّل قايمة الأعمال. جرّب تاني بعد لحظات.',
       'err.AI_QUOTA': 'المساعد مشغول دلوقتي. جرّب بعد دقيقة.',
       'err.AI_TIMEOUT': 'الرد أخد وقت طويل. جرّب تاني.',
+      'err.AI_CONFIG': 'المساعد غير متاح حاليًا بسبب إعدادات الخدمة. جرّب لاحقًا.',
+      'err.AI_ERROR': 'خدمة الذكاء الاصطناعي مش متاحة دلوقتي. جرّب بعد شوية.',
+      'err.AI_BLOCKED': 'ما قدرتش أطلّع رد على السؤال ده. جرّب تصيغه بشكل تاني.',
       'err.GENERIC': 'حصل خطأ. جرّب تاني.'
     },
     en: {
@@ -43,6 +46,9 @@
       'err.CATALOG_UNAVAILABLE': 'Loading the artwork list. Please try again in a moment.',
       'err.AI_QUOTA': 'The assistant is busy right now. Try again in a minute.',
       'err.AI_TIMEOUT': 'That took too long. Please try again.',
+      'err.AI_CONFIG': 'The assistant is unavailable right now because of a service setting. Please try later.',
+      'err.AI_ERROR': 'The AI service is unavailable right now. Please try again shortly.',
+      'err.AI_BLOCKED': 'I couldn\'t come up with an answer to that. Try rephrasing it.',
       'err.GENERIC': 'Something went wrong. Please try again.'
     }
   };
